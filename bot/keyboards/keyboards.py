@@ -7,3 +7,10 @@ def main_keyboard() -> ReplyKeyboardMarkup:
     ], resize_keyboard=True
     )
     return kb
+
+def cancel_keyboard() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton('/cancel')]
+    ], resize_keyboard=True
+    )
+    return kb

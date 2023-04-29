@@ -5,7 +5,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 
 from config import TOKEN_API
-from bot.keyboards.keyboards import main_keyboard
+from bot.keyboards.keyboards import main_keyboard, cancel_keyboard
 from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb
 from bot.states.states import MyDebtorsStatesGroup
 from bot.db.sqlite import db_start, create_debt, get_user_debtors, get_all_debtors_login, get_recipient_debts
@@ -92,12 +92,24 @@ async def callback_debtors_main(callback: types.CallbackQuery) -> None:
             reply_markup=change_debots_ikb(),
             chat_id=callback.from_user.id)
 
+@dp.message_handler(commands=['cancel'], state='*')
+async def cansel_cmd(mess: types.Message, state: FSMContext):
+    await state.finish()
+    await bot.delete_message(chat_id=mess.from_user.id,
+                             message_id=mess.message_id)
+    await mess.answer(text='Вы вернулись в главное меню',
+                      reply_markup=main_keyboard())
+
+
 
 @dp.callback_query_handler(Text(equals=['new_debtor', 'change_a_debtor']))
 async def add_change_debtor(callback: types.CallbackQuery) -> None:
     if callback.data == 'new_debtor':
         await MyDebtorsStatesGroup.name_debtor.set()
-        await callback.message.answer(text='Введите имя должника')
+        await bot.delete_message(chat_id=callback.from_user.id,
+                                 message_id=callback.message.message_id)
+        await callback.message.answer(text='Введите имя должника',
+                                      reply_markup=cancel_keyboard())
     else:
         await callback.answer(text='Будет доступно позже')
 
