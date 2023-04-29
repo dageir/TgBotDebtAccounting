@@ -1,10 +1,12 @@
 from aiogram import Dispatcher, types, Bot, executor
 from aiogram.dispatcher.filters import Text
 from aiogram.types import ReplyKeyboardRemove
+from aiogram.dispatcher import FSMContext
 
 from config import TOKEN_API
 from bot.keyboards.keyboards import main_keyboard
-from bot.keyboards.InlineKeyboards import my_debots_kb
+from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb
+from bot.states.states import MyDebtorsStatesGroup
 
 async def on_startup(_):
     # await db_start()
@@ -48,18 +50,30 @@ async def my_debtors_cmd(mess: types.Message) -> None:
     await mess.answer(text='Выберите опцию',
                       reply_markup=ReplyKeyboardRemove())
     await bot.send_photo(photo='https://png.pngtree.com/png-clipart/20200322/ourlarge/pngtree-empty-wallet-illustration-png-image_2163566.jpg',
-                         reply_markup=my_debots_kb(),
+                         reply_markup=my_debots_ikb(),
                          chat_id=mess.chat.id)
 
 
-@dp.callback_query_handler(Text(equals='all_debtors'))
+@dp.callback_query_handler(Text(equals=['cancel', 'change_debtors', 'all_debtors']))
 async def callback_all_debtors(callback: types.CallbackQuery) -> None:
-    await callback.answer(text='test')
 
+    if callback.data == 'cancel':
+        await bot.delete_message(chat_id=callback.from_user.id,
+                                 message_id=callback.message.message_id)
+        await callback.message.answer(text='Вы вернулись в главное меню',
+                                      reply_markup=main_keyboard())
 
-@dp.callback_query_handler(Text(equals='cancel'))
-async def callback_all_debtors(callback: types.CallbackQuery) -> None:
-    await callback.answer(text='Вы вернулись в главное меню')
+    elif callback.data == 'all_debtors':
+        await callback.answer(text='test')
+
+    elif callback.data == 'change_debtors':
+        await bot.delete_message(chat_id=callback.from_user.id,
+                                 message_id=callback.message.message_id)
+        await bot.send_photo(
+            photo='https://kartinki.pibig.info/uploads/posts/2023-04/1681157639_kartinki-pibig-info-p-dolzhnik-kartinka-arti-vkontakte-2.jpg',
+            reply_markup=change_debots_ikb(),
+            chat_id=callback.from_user.id)
+
 
 
 
