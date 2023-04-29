@@ -8,8 +8,9 @@ from config import TOKEN_API
 from bot.keyboards.keyboards import main_keyboard
 from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb
 from bot.states.states import MyDebtorsStatesGroup
-from bot.db.sqlite import db_start, create_debt, get_user_debtors
-from bot.processors.text_processors import craete_text_format
+from bot.db.sqlite import db_start, create_debt, get_user_debtors, get_all_debtors_login, get_recipient_debts
+
+from bot.processors.text_processors import craete_text_format, create_recipient_debts_data
 
 
 async def on_startup(_):
@@ -32,7 +33,7 @@ start_text = """
 help_text = """
 <b>/start</b> - <em>запустить бота</em>
 <b>/my_debtors</b> - <em>откроет меню для отслеживания и редактирования ваших должников</em>
-<b>/start</b> - <em>покажет ваши долги</em>
+<b>/my_debts</b> - <em>покажет ваши долги</em>
 """
 
 
@@ -62,7 +63,7 @@ async def my_debtors_cmd(mess: types.Message) -> None:
 @dp.message_handler(commands=['my_debts'])
 async def my_debtors_cmd(mess: types.Message) -> None:
     await mess.delete()
-    await mess.answer('Будет доступно позже')
+    await mess.answer(text=await create_recipient_debts_data(await get_recipient_debts(mess.from_user.username)))
 
 
 @dp.callback_query_handler(Text(equals=['cancel', 'change_debtors', 'all_debtors']))
@@ -75,7 +76,13 @@ async def callback_debtors_main(callback: types.CallbackQuery) -> None:
                                       reply_markup=main_keyboard())
 
     elif callback.data == 'all_debtors':
-        await callback.message.answer(text=await craete_text_format(await get_user_debtors(callback.from_user.id)))
+        text = await craete_text_format(await get_user_debtors(callback.from_user.id))
+        if text == '':
+            await callback.message.answer(text='У вас пока нет должников')
+            await callback.answer()
+        else:
+            await callback.message.answer(text=text)
+            await callback.answer()
 
     elif callback.data == 'change_debtors':
         await bot.delete_message(chat_id=callback.from_user.id,
@@ -105,10 +112,15 @@ async def get_name_debtor(mess: types.Message, state: FSMContext):
 
 @dp.message_handler(state=MyDebtorsStatesGroup.login_debtor)
 async def get_login_debtor(mess: types.Message, state: FSMContext):
-    async with state.proxy() as data:
-        data['login_debtor'] = mess.text
-    await MyDebtorsStatesGroup.next()
-    await mess.answer('Введите сумму долга')
+    if mess.text in await get_all_debtors_login(mess.from_user.id):
+        await mess.answer('Данный должник уже существует, отредактируйте текущий долг',
+                          reply_markup=change_debots_ikb())
+        await state.finish()
+    else:
+        async with state.proxy() as data:
+            data['login_debtor'] = mess.text
+        await MyDebtorsStatesGroup.next()
+        await mess.answer('Введите сумму долга')
 
 @dp.message_handler(state=MyDebtorsStatesGroup.debt_amount)
 async def get_debt_amount(mess: types.Message, state: FSMContext):
@@ -117,11 +129,12 @@ async def get_debt_amount(mess: types.Message, state: FSMContext):
     await MyDebtorsStatesGroup.next()
     await mess.answer('Введите плановую дату возврата долга')
 
+
 @dp.message_handler(state=MyDebtorsStatesGroup.date_return)
 async def get_date_return(mess: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['date_return'] = mess.text
-    await create_debt(mess.from_user.id, data['name_debtor'], data['login_debtor'],
+    await create_debt(mess.from_user.id, mess.from_user.username, data['name_debtor'], data['login_debtor'],
                       data['debt_amount'], data['date_return'])
     await mess.answer('Долг сохранён')
     await state.finish()
