@@ -1,6 +1,7 @@
 from aiogram import Dispatcher, types, Bot, executor
 from aiogram.dispatcher.filters import Text
 from aiogram.types import ReplyKeyboardRemove
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 
 from config import TOKEN_API
@@ -12,10 +13,11 @@ async def on_startup(_):
     # await db_start()
     print('Запустился')
 
-# storage = MemoryStorage()
+storage = MemoryStorage()
 
 bot = Bot(TOKEN_API)
-dp = Dispatcher(bot=bot)
+dp = Dispatcher(bot=bot,
+                storage=storage)
 
 
 start_text = """
@@ -53,9 +55,13 @@ async def my_debtors_cmd(mess: types.Message) -> None:
                          reply_markup=my_debots_ikb(),
                          chat_id=mess.chat.id)
 
+@dp.message_handler(commands=['my_debts'])
+async def my_debtors_cmd(mess: types.Message) -> None:
+    await mess.delete()
+    await mess.answer('Будет доступно позже')
 
 @dp.callback_query_handler(Text(equals=['cancel', 'change_debtors', 'all_debtors']))
-async def callback_all_debtors(callback: types.CallbackQuery) -> None:
+async def callback_debtors_main(callback: types.CallbackQuery) -> None:
 
     if callback.data == 'cancel':
         await bot.delete_message(chat_id=callback.from_user.id,
@@ -64,7 +70,7 @@ async def callback_all_debtors(callback: types.CallbackQuery) -> None:
                                       reply_markup=main_keyboard())
 
     elif callback.data == 'all_debtors':
-        await callback.answer(text='test')
+        await callback.answer(text='Будет доступно позже')
 
     elif callback.data == 'change_debtors':
         await bot.delete_message(chat_id=callback.from_user.id,
@@ -74,7 +80,42 @@ async def callback_all_debtors(callback: types.CallbackQuery) -> None:
             reply_markup=change_debots_ikb(),
             chat_id=callback.from_user.id)
 
+@dp.callback_query_handler(Text(equals=['new_debtor', 'change_a_debtor']))
+async def add_change_debtor(callback: types.CallbackQuery) -> None:
+    if callback.data == 'new_debtor':
+        await MyDebtorsStatesGroup.name_debtor.set()
+        await callback.message.answer(text='Введите имя должника')
+    else:
+        await callback.answer(text='Будет доступно позже')
 
+@dp.message_handler(state=MyDebtorsStatesGroup.name_debtor)
+async def get_name_debtor(mess: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['name_debtor'] = mess.text
+    await MyDebtorsStatesGroup.next()
+    await mess.answer('Введите логин телеграмм должника без @')
+
+
+@dp.message_handler(state=MyDebtorsStatesGroup.login_debtor)
+async def get_login_debtor(mess: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['login_debtor'] = mess.text
+    await MyDebtorsStatesGroup.next()
+    await mess.answer('Введите сумму долга')
+
+@dp.message_handler(state=MyDebtorsStatesGroup.debt_amount)
+async def get_debt_amount(mess: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['debt_amount'] = mess.text
+    await MyDebtorsStatesGroup.next()
+    await mess.answer('Введите плановую дату возврата долга')
+
+@dp.message_handler(state=MyDebtorsStatesGroup.debt_amount)
+async def get_date_return(mess: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['date_return'] = mess.text
+    await mess.answer('Долг сохранён')
+    await state.finish()
 
 
 if __name__ == '__main__':
