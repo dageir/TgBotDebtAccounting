@@ -15,3 +15,13 @@ def change_debots_ikb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text='В главное меню', callback_data='cancel')]
     ], row_width=2)
     return ikb
+
+
+def debt_editing_menu_ikb() -> InlineKeyboardMarkup:
+    ikb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='Увеличить сумму долга', callback_data='increase_amount')],
+        [InlineKeyboardButton(text='Уменьшить сумму долга', callback_data='decrease_amount')],
+        [InlineKeyboardButton(text='Закрыть долг', callback_data='close_debt')],
+        [InlineKeyboardButton(text='В главное меню', callback_data='cancel')]
+    ], row_width=2)
+    return ikb

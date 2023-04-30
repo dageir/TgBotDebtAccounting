@@ -22,6 +22,7 @@ async def create_debt(user_id_recipient, login_recipient, name_debtor, login_deb
 async def get_user_debtors(user_id: str) -> list:
     return cur.execute(f"SELECT * FROM all_debts WHERE user_id_recipient == {user_id}").fetchall()
 
+
 async def get_all_debtors_login(user_id: str) -> list:
     debtors_login = cur.execute(f'SELECT login_debtor FROM all_debts WHERE user_id_recipient == {user_id}').fetchall()
     login_list = []
@@ -32,5 +33,17 @@ async def get_all_debtors_login(user_id: str) -> list:
 
 async def get_recipient_debts(user_login: str):
     return cur.execute(f"SELECT * FROM all_debts WHERE login_debtor == '{user_login}'").fetchall()
+
+
+async def check_user_debt(user_login: str, user_id_recipient: str) -> bool:
+    now = cur.execute(f"SELECT id_debt FROM all_debts WHERE login_debtor == '{user_login}' AND user_id_recipient == '{user_id_recipient}'").fetchone()
+    if now == None:
+        return False
+    return True
+
+
+async def update_user_debt(user_login: str, new_debt_amount: int):
+    cur.execute(f"UPDATE all_debts SET debt_amount = debt_amount + '{new_debt_amount}' WHERE login_debtor = '{user_login}'")
+    db.commit()
 
 

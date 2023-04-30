@@ -6,9 +6,10 @@ from aiogram.dispatcher import FSMContext
 
 from config import TOKEN_API
 from bot.keyboards.keyboards import main_keyboard, cancel_keyboard
-from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb
-from bot.states.states import MyDebtorsStatesGroup
-from bot.db.sqlite import db_start, create_debt, get_user_debtors, get_all_debtors_login, get_recipient_debts
+from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb, debt_editing_menu_ikb
+from bot.states.states import MyDebtorsStatesGroup, ChangeDebtStatesGroup
+from bot.db.sqlite import db_start, create_debt, get_user_debtors, get_all_debtors_login, get_recipient_debts, \
+    check_user_debt
 
 from bot.processors.text_processors import craete_text_format, create_recipient_debts_data
 
@@ -111,7 +112,22 @@ async def add_change_debtor(callback: types.CallbackQuery) -> None:
         await callback.message.answer(text='Введите имя должника',
                                       reply_markup=cancel_keyboard())
     else:
-        await callback.answer(text='Будет доступно позже')
+        await ChangeDebtStatesGroup.login.set()
+        await callback.message.answer(text='Введите логин должника',
+                                      reply_markup=cancel_keyboard())
+
+
+@dp.message_handler(state=ChangeDebtStatesGroup.login)
+async def debt_editing_menu(mess: types.Message, state: FSMContext) -> None:
+    if await check_user_debt(mess.text, mess.from_user.id) == True:
+        async with state.proxy() as data:
+            data['login'] = mess.text
+        await bot.send_photo(
+            photo='https://kartinki.pibig.info/uploads/posts/2023-04/1681157639_kartinki-pibig-info-p-dolzhnik-kartinka-arti-vkontakte-2.jpg',
+            reply_markup=debt_editing_menu_ikb(),
+            chat_id=mess.from_user.id)
+    else:
+        await mess.answer(text='Такого должника не существует, проверьте корректность введённых данных')
 
 
 @dp.message_handler(state=MyDebtorsStatesGroup.name_debtor)
