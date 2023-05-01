@@ -24,7 +24,7 @@ async def get_user_debtors(user_id: str) -> list:
 
 
 async def get_all_debtors_login(user_id: str) -> list:
-    debtors_login = cur.execute(f'SELECT login_debtor FROM all_debts WHERE user_id_recipient == {user_id}').fetchall()
+    debtors_login = cur.execute(f"SELECT login_debtor FROM all_debts WHERE user_id_recipient == '{user_id}'").fetchall()
     login_list = []
     for login in debtors_login:
         login_list.append(login[0])
@@ -42,8 +42,16 @@ async def check_user_debt(user_login: str, user_id_recipient: str) -> bool:
     return True
 
 
-async def update_user_debt(user_login: str, new_debt_amount: int):
-    cur.execute(f"UPDATE all_debts SET debt_amount = debt_amount + '{new_debt_amount}' WHERE login_debtor = '{user_login}'")
+async def get_debt_amount_sql(user_login: str, id_recipient: str) -> int:
+    return cur.execute(f"SELECT debt_amount FROM all_debts WHERE login_debtor == '{user_login}' AND user_id_recipient ='{id_recipient}'").fetchone()[0]
+
+
+async def update_user_debt(user_login: str, new_debt_amount: int, id_recipient: str) -> None:
+    cur.execute(f"UPDATE all_debts SET debt_amount = '{new_debt_amount}' WHERE login_debtor = '{user_login}' AND user_id_recipient ='{id_recipient}'")
     db.commit()
 
+
+async def delete_a_debt(user_login: str, id_recipient: str) -> None:
+    cur.execute(f"DELETE FROM all_debts WHERE login_debtor = '{user_login}' AND user_id_recipient ='{id_recipient}'")
+    db.commit()
 

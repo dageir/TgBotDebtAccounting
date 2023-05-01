@@ -9,7 +9,7 @@ from bot.keyboards.keyboards import main_keyboard, cancel_keyboard
 from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb, debt_editing_menu_ikb
 from bot.states.states import MyDebtorsStatesGroup, ChangeDebtStatesGroup
 from bot.db.sqlite import db_start, create_debt, get_user_debtors, get_all_debtors_login, get_recipient_debts, \
-    check_user_debt
+    check_user_debt, get_debt_amount_sql, update_user_debt, delete_a_debt
 
 from bot.processors.text_processors import craete_text_format, create_recipient_debts_data
 
@@ -68,9 +68,9 @@ async def my_debtors_cmd(mess: types.Message) -> None:
 
 
 @dp.callback_query_handler(Text(equals=['cancel', 'change_debtors', 'all_debtors']))
-async def callback_debtors_main(callback: types.CallbackQuery) -> None:
-
+async def callback_debtors_main(callback: types.CallbackQuery, state: FSMContext) -> None:
     if callback.data == 'cancel':
+        await state.finish()
         await bot.delete_message(chat_id=callback.from_user.id,
                                  message_id=callback.message.message_id)
         await callback.message.answer(text='Вы вернулись в главное меню',
@@ -105,16 +105,17 @@ async def cansel_cmd(mess: types.Message, state: FSMContext):
 
 @dp.callback_query_handler(Text(equals=['new_debtor', 'change_a_debtor']))
 async def add_change_debtor(callback: types.CallbackQuery) -> None:
+    await bot.delete_message(chat_id=callback.from_user.id,
+                             message_id=callback.message.message_id)
     if callback.data == 'new_debtor':
         await MyDebtorsStatesGroup.name_debtor.set()
-        await bot.delete_message(chat_id=callback.from_user.id,
-                                 message_id=callback.message.message_id)
         await callback.message.answer(text='Введите имя должника',
                                       reply_markup=cancel_keyboard())
     else:
         await ChangeDebtStatesGroup.login.set()
         await callback.message.answer(text='Введите логин должника',
                                       reply_markup=cancel_keyboard())
+        await callback.answer()
 
 
 @dp.message_handler(state=ChangeDebtStatesGroup.login)
@@ -128,6 +129,53 @@ async def debt_editing_menu(mess: types.Message, state: FSMContext) -> None:
             chat_id=mess.from_user.id)
     else:
         await mess.answer(text='Такого должника не существует, проверьте корректность введённых данных')
+
+
+@dp.callback_query_handler(Text(equals=['increase_amount', 'decrease_amount', 'close_debt']), state=ChangeDebtStatesGroup.login)
+async def var_change_debt(callback: types.CallbackQuery,state: FSMContext) -> None:
+    async with state.proxy() as data:
+        pass
+    await bot.delete_message(chat_id=callback.from_user.id,
+                             message_id=callback.message.message_id)
+    if callback.data == 'increase_amount':
+        await ChangeDebtStatesGroup.change_amount_to_increase.set()
+        await callback.message.answer(text='Введите сумму, на которую надо увеличить долг')
+        await callback.answer()
+    elif callback.data == 'decrease_amount':
+        await ChangeDebtStatesGroup.change_amount_to_decrease.set()
+        await callback.message.answer(text='Введите сумму, на которую надо уменьшить долг')
+        await callback.answer()
+    else:
+        await delete_a_debt(data['login'], callback.from_user.id)
+        await callback.message.answer(text='Долг успешно закрыт')
+        await callback.answer()
+
+
+@dp.message_handler(state=ChangeDebtStatesGroup.change_amount_to_increase)
+async def increase_a_debt(mess: types.Message, state: FSMContext) -> None:
+    async with state.proxy() as data:
+        data['amount'] = int(mess.text)
+        data['old_amount'] = await get_debt_amount_sql(user_login=data['login'],
+                                                       id_recipient=mess.from_user.id)
+        data['new_amount'] = data['old_amount'] + data['amount']
+    await update_user_debt(data['login'], data['new_amount'], mess.from_user.id)
+    await mess.answer('Долг был успешно увеличен')
+
+
+@dp.message_handler(state=ChangeDebtStatesGroup.change_amount_to_decrease)
+async def decrease_a_debt(mess: types.Message, state: FSMContext) -> None:
+    async with state.proxy() as data:
+        data['amount'] = int(mess.text)
+        data['old_amount'] = await get_debt_amount_sql(user_login=data['login'],
+                                                       id_recipient=mess.from_user.id)
+        data['new_amount'] = data['old_amount'] - data['amount']
+    if data['new_amount'] <= 0:
+        await delete_a_debt(data['login'], mess.from_user.id)
+        await mess.answer('Долг стал равен нулю (или меньше, поэтому был закрыт)')
+    else:
+        await update_user_debt(data['login'], data['new_amount'], mess.from_user.id)
+        await mess.answer('Долг был успешно уменьшен')
+
 
 
 @dp.message_handler(state=MyDebtorsStatesGroup.name_debtor)
