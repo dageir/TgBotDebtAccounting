@@ -17,3 +17,14 @@ async def create_recipient_debts_data(text: list) -> str:
             st += f'@{i[2]} - {str(i[5])} рублей. Отдать надо до {i[6]}\n'
 
     return st
+
+async def create_recipient_non_approve_debts_data(text: list) -> str:
+    if text == []:
+        st = 'У вас нет неподтверждённых долгов!'
+
+    else:
+        st = 'Долги, которые ожидают подтверждения:\n\n'
+        for i in text:
+            st += f'@{i[2]} - {str(i[5])} рублей. Срок отдачи - {i[6]}\n'
+
+    return st

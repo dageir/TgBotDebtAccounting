@@ -12,3 +12,8 @@ class ChangeDebtStatesGroup(StatesGroup):
     change_amount_to_increase = State()
     change_amount_to_decrease = State()
 
+
+class ApproveDebt(StatesGroup):
+    login_recipient = State()
+    approve = State()
+
