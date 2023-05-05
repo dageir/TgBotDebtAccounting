@@ -7,13 +7,14 @@ from aiogram.dispatcher import FSMContext
 from config import TOKEN_API
 from bot.keyboards.keyboards import main_keyboard, cancel_keyboard
 from bot.keyboards.InlineKeyboards import my_debots_ikb, change_debots_ikb, debt_editing_menu_ikb, my_debts_menu
-from bot.states.states import MyDebtorsStatesGroup, ChangeDebtStatesGroup, ApproveDebt
+from bot.states.states import MyDebtorsStatesGroup, ChangeDebtStatesGroup, ApproveDebt, DisputeDebt
 from bot.db.sqlite import db_start, create_debt, get_user_debtors, get_all_debtors_login, get_recipient_debts, \
     check_user_debt, get_debt_amount_sql, update_user_debt, delete_a_debt, add_new_user, check_user, update_user_login, \
-    get_non_approve_debts, get_all_non_approve_recipient_login, approve_debt
+    get_non_approve_debts, get_all_non_approve_recipient_login, approve_debt, get_id_debt, create_dispute, \
+    get_id_by_username
 
 from bot.processors.text_processors import craete_text_format, create_recipient_debts_data, \
-    create_recipient_non_approve_debts_data
+    create_recipient_non_approve_debts_data, create_status_debts_data
 
 
 async def on_startup(_):
@@ -83,22 +84,25 @@ async def my_debtors_cmd(mess: types.Message) -> None:
 
 @dp.callback_query_handler(Text(equals=['cancel', 'change_debtors', 'all_debtors', 'status_debts']))
 async def callback_debtors_main(callback: types.CallbackQuery, state: FSMContext) -> None:
+    async with state.proxy() as data:
+        data['data'] = await get_user_debtors(callback.from_user.id)
+        data['text'] = await craete_text_format(await get_user_debtors(callback.from_user.id))
+
     if callback.data == 'cancel':
         await state.finish()
         await bot.delete_message(chat_id=callback.from_user.id,
                                  message_id=callback.message.message_id)
         await callback.message.answer(text='Вы вернулись в главное меню',
                                       reply_markup=main_keyboard())
-
     elif callback.data == 'all_debtors':
-        text = await craete_text_format(await get_user_debtors(callback.from_user.id))
-        if text == '':
+        if data['text'] == '':
             await callback.message.answer(text='У вас пока нет должников')
             await callback.answer()
         else:
-            await callback.message.answer(text=text)
+            await callback.message.answer(text=data['text'])
             await callback.answer()
     elif callback.data == 'change_debtors':
+        await state.finish()
         await bot.delete_message(chat_id=callback.from_user.id,
                                  message_id=callback.message.message_id)
         await bot.send_photo(
@@ -106,7 +110,9 @@ async def callback_debtors_main(callback: types.CallbackQuery, state: FSMContext
             reply_markup=change_debots_ikb(),
             chat_id=callback.from_user.id)
     elif callback.data == 'status_debts':
-        await callback.answer(text='Будет доступно позже')
+        await callback.message.answer(text=await create_status_debts_data(text=data['data']))
+        await state.finish()
+        await callback.answer()
 
 @dp.message_handler(commands=['cancel'], state='*')
 async def cansel_cmd(mess: types.Message, state: FSMContext):
@@ -253,23 +259,68 @@ async def get_date_return(mess: types.Message, state: FSMContext):
 
 
 @dp.callback_query_handler(Text(equals=['all_my_debts', 'approve_debt', 'dispute_debt', 'history_dispute']))
-async def my_debts_ikb_menu(callback: types.CallbackQuery) -> None:
+async def my_debts_ikb_menu(callback: types.CallbackQuery, state: FSMContext) -> None:
     if callback.data == 'all_my_debts':
         await callback.message.answer(text=await create_recipient_debts_data(await get_recipient_debts(callback.from_user.username)))
         await callback.answer()
     elif callback.data == 'approve_debt':
-        await bot.delete_message(chat_id=callback.from_user.id,
-                                 message_id=callback.message.message_id)
-        #Переделать отображение, если нет долгов на подтверждение, не просить ввести логин
-        await callback.message.answer(text=await create_recipient_non_approve_debts_data(await get_non_approve_debts(callback.from_user.username)))
-        await callback.message.answer(text='Введите логин того, чей долг хотите подтвердить',
+        async with state.proxy() as data:
+            data['check'] = await get_non_approve_debts(callback.from_user.username)
+        if data['check'] == []:
+            await callback.message.answer(text=await create_recipient_non_approve_debts_data(data['check']))
+            await state.finish()
+            await callback.answer()
+        else:
+            await bot.delete_message(chat_id=callback.from_user.id,
+                                     message_id=callback.message.message_id)
+            await callback.message.answer(text=await create_recipient_non_approve_debts_data(data['check']))
+            await callback.message.answer(text='Введите логин того, чей долг хотите подтвердить',
                                       reply_markup=cancel_keyboard())
-        await ApproveDebt.login_recipient.set()
-        await callback.answer()
+            await ApproveDebt.login_recipient.set()
+            await callback.answer()
     elif callback.data == 'dispute_debt':
-        await callback.answer(text='Будет доступно позже')
+        async with state.proxy() as data:
+            data['check'] = await get_non_approve_debts(callback.from_user.username)
+        if data['check'] == []:
+            await callback.message.answer(text=await create_recipient_non_approve_debts_data(data['check']))
+        else:
+            await callback.message.answer(text=await create_recipient_non_approve_debts_data(data['check']))
+            await callback.message.answer(text='<b>Введите логин того (без @), чей долг хотите оспорить </b><em>('
+                                               'можно оспорить только тот долг, который вы ещё не подтвердили)</em>',
+                                          parse_mode='HTML',
+                                          reply_markup=cancel_keyboard())
+            await bot.delete_message(chat_id=callback.from_user.id,
+                                     message_id=callback.message.message_id)
+            await DisputeDebt.login_recipient.set()
     elif callback.data == 'history_dispute':
         await callback.answer(text='Будет доступно позже')
+
+
+@dp.message_handler(state=DisputeDebt.login_recipient)
+async def get_login_recipient_for_dispute(mess: types.Message, state: FSMContext) -> None:
+    if mess.text in await get_all_non_approve_recipient_login(mess.from_user.username):
+        async with state.proxy() as data:
+            data['login_r'] = mess.text
+            data['id_debt'] = await get_id_debt(login_r=data['login_r'], login_debtor=mess.from_user.username)
+        await DisputeDebt.text.set()
+        await mess.answer('Введите комментарий к спору (почему вы не согласны с данным долгом)')
+    else:
+        await mess.answer('Долгов по данному логину нет, проверьте ещё раз список долгов')
+        await mess.answer(text=await create_recipient_non_approve_debts_data(
+            await get_non_approve_debts(mess.from_user.username)))
+
+
+@dp.message_handler(state=DisputeDebt.text)
+async def get_text_for_dispute(mess: types.Message, state: FSMContext) -> None:
+    async with state.proxy() as data:
+        data['text'] = mess.text
+        data['id_recipient'] = await get_id_by_username(login=data['login_r'])
+    await create_dispute(id_debt=data['id_debt'], text=data['text'], type='debtor',
+                         id_recipient=data['id_recipient'], id_debtor=mess.from_user.id)
+    await state.finish()
+    await mess.answer(text='Спор был успешно создан, можете проверить его в меню всех споров',
+                      reply_markup=main_keyboard())
+
 
 
 @dp.message_handler(state=ApproveDebt.login_recipient)

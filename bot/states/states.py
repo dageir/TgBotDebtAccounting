@@ -17,3 +17,7 @@ class ApproveDebt(StatesGroup):
     login_recipient = State()
     approve = State()
 
+
+class DisputeDebt(StatesGroup):
+    login_recipient = State()
+    text = State()

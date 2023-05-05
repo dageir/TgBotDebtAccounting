@@ -1,6 +1,6 @@
 import sqlite3 as sq
 from uuid import uuid4
-
+from datetime import date
 async def db_start():
     global db, cur
 
@@ -90,3 +90,19 @@ async def get_all_non_approve_recipient_login(user_login: str) -> list:
 async def approve_debt(login_debt: str, login_recipient: str) -> None:
     cur.execute(f"UPDATE all_debts SET approve = True WHERE login_debtor = '{login_debt}' AND login_recipient = '{login_recipient}' AND active == True")
     db.commit()
+
+
+async def create_dispute(id_debt: str, text: str, type: str, id_recipient: str, id_debtor: str) -> None:
+    cur.execute("INSERT INTO history_dispute VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+                (str(uuid4()), id_debt, text, type, id_recipient, id_debtor,
+                 str(date.today()).replace('-','.'), True))
+    db.commit()
+
+
+async def get_id_debt(login_r: str, login_debtor: str) -> str:
+    return cur.execute(f"SELECT id_debt FROM all_debts WHERE login_recipient == '{login_r}' "
+                       f"AND login_debtor == '{login_debtor}' "
+                       f"AND active == True AND approve == False").fetchone()[0]
+
+async def get_id_by_username(login: str) -> str:
+    return cur.execute(f"SELECT user_id FROM users WHERE login == '{login}' ").fetchone()[0]
