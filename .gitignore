@@ -1,4 +1,6 @@
+.*
 venv
 config.py
 identifier.sqlite
 tg_bot_debts.db
+bot/tests
