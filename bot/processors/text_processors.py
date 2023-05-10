@@ -49,6 +49,10 @@ async def create_all_rec_dispute_data(text: list) -> str:
     return data
 
 
-async def create_history_dispute(data: dict, login_r: str,
-                                 login_d: str) -> str:
-    pass
+async def create_history_dispute(data: dict, login_r: str = None,
+                                 login_d: str = None) -> str:
+    dialog = ''
+    for i in data.keys():
+        dialog += f'<b>{login_d}</b>: ' if data[i]['type'] == 'debtor' else f'<b>{login_r}</b>: '
+        dialog += f'{data[i]["text"]} <em>(Дата: {data[i]["date"]})</em>\n\n'
+    return dialog

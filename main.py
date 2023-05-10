@@ -93,7 +93,7 @@ async def my_debtors_cmd(mess: types.Message) -> None:
 @dp.message_handler(commands=['history_dispute'])
 async def history_dispute_cmd(mess: types.Message) -> None:
     await mess.delete()
-    await mess.answer(text='Выберите опцию',
+    await mess.answer(text='Выберите, с кем хотите просмотреть спор',
                       reply_markup=ReplyKeyboardRemove())
     await bot.send_photo(photo='https://4brain.ru/blog/wp-content/uploads/2020/05/v-spore-rozhdaetsya-istina.jpg',
                          reply_markup=InlineKeyboards.history_dispute_menu(),
@@ -390,15 +390,40 @@ async def history_dispute_ikb_menu(callback: types.CallbackQuery, state: FSMCont
 @dp.message_handler(state=states.HistoryDispute.login)
 async def dispute_my_debts(mess: types.Message, state:FSMContext) -> None:
     async with state.proxy() as data:
-        data['login'] = mess.text
-        data['id_rec'] = await sqlite.get_id_by_username(data['login'])
-    if data['login'] not in data['rec']:
+        data['login_r'] = mess.text
+        data['id_rec'] = await sqlite.get_id_by_username(data['login_r'])
+    if data['login_r'] not in data['rec']:
         await mess.answer('У вас нет открытого спора с этим пользователем, введите повторно')
         await mess.answer(text=await text_processors.create_all_rec_dispute_data(data['rec']))
     else:
-        await mess.answer(text=await text_processors.create_history_dispute(
-            data=await sqlite.get_full_history_dispute(debtor_id=mess.from_user.id,
-                                                  recipient_id=data['id_rec'])))
+        await states.HistoryDispute.dispute_menu.set()
+        await mess.answer(text='Выберите опцию',
+                          reply_markup=ReplyKeyboardRemove())
+        await bot.send_photo(photo='https://4brain.ru/blog/wp-content/uploads/2020/05/v-spore-rozhdaetsya-istina.jpg',
+                             reply_markup=InlineKeyboards.dispute_menu(),
+                             chat_id=mess.chat.id)
+
+
+
+
+@dp.callback_query_handler(Text(equals=['mess_histoty', 'new_mess', 'approve_debt_by_dispute']),
+                           state=states.HistoryDispute.dispute_menu)
+async def dispute_menu(callback: types.CallbackQuery, state:FSMContext) -> None:
+    async with state.proxy() as data:
+        pass
+    if callback.data == 'mess_histoty':
+        await callback.message.answer(text=await text_processors.create_history_dispute(
+            data=await sqlite.get_full_history_dispute(debtor_id=callback.from_user.id,
+                                                       recipient_id=data['id_rec']),
+            login_r=data['login_r'],
+            login_d=callback.from_user.username
+        ),
+                          parse_mode='HTML')
+        await callback.answer()
+    elif callback.data == 'new_mess':
+        await callback.answer('Будет доступно позже')
+    elif callback.data == 'approve_debt_by_dispute':
+        await callback.answer('Будет доступно позже')
 
 
 if __name__ == '__main__':

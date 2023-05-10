@@ -42,8 +42,18 @@ def my_debts_menu() -> InlineKeyboardMarkup:
 
 def history_dispute_menu() -> InlineKeyboardMarkup:
     ikb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='Споры по моим долгам', callback_data='dispute_my_debts'),
-         InlineKeyboardButton(text='Споры с моими должниками', callback_data='dispute_with_debtors')],
+        [InlineKeyboardButton(text='Мои долги', callback_data='dispute_my_debts'),
+         InlineKeyboardButton(text='Мои должники', callback_data='dispute_with_debtors')],
+        [InlineKeyboardButton(text='В главное меню', callback_data='cancel')]
+    ], row_width=2)
+    return ikb
+
+
+def dispute_menu() -> InlineKeyboardMarkup:
+    ikb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='История сообщений', callback_data='mess_histoty'),
+         InlineKeyboardButton(text='Написать новое сообщение', callback_data='new_mess')],
+        [InlineKeyboardButton(text='Согласиться с долгом', callback_data='approve_debt_by_dispute')],
         [InlineKeyboardButton(text='В главное меню', callback_data='cancel')]
     ], row_width=2)
     return ikb
