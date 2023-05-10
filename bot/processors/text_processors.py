@@ -1,4 +1,4 @@
-async def craete_text_format(text: list) -> str:
+async def create_text_format(text: list) -> str:
     st = ''
     for i in text:
         st += f'Имя должника: {i[3]}. Логин должника: @{i[4]}. ' \
@@ -40,3 +40,15 @@ async def create_status_debts_data(text: list) -> str:
     else:
         end_st = f'Долги, ожидающие подтверждения:\n\n{st_0}\n\nПодтверждённые долги:\n\n{st_1}'
     return end_st
+
+
+async def create_all_rec_dispute_data(text: list) -> str:
+    data = 'Открыты споры:\n\n'
+    for i in range(len(text)):
+        data += f'{i+1}. @{text[i]}\n'
+    return data
+
+
+async def create_history_dispute(data: dict, login_r: str,
+                                 login_d: str) -> str:
+    pass
