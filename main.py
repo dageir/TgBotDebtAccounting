@@ -130,13 +130,13 @@ async def callback_debtors_main(callback: types.CallbackQuery, state: FSMContext
         await state.finish()
         await callback.answer()
 
+
 @dp.message_handler(commands=['cancel'], state='*')
 async def cansel_cmd(mess: types.Message, state: FSMContext):
     await state.finish()
     await main_processors.delete_mess(callback=mess)
     await mess.answer(text='Вы вернулись в главное меню',
                       reply_markup=keyboards.main_keyboard())
-
 
 
 @dp.callback_query_handler(Text(equals=['new_debtor', 'change_a_debtor']))
@@ -180,7 +180,7 @@ async def var_change_debt(callback: types.CallbackQuery,state: FSMContext) -> No
         await callback.message.answer(text='Введите сумму, на которую надо уменьшить долг')
         await callback.answer()
     else:
-        await sqlite.delete_a_debt(data['login'], callback.from_user.id)
+        await sqlite.close_a_debt(data['login'], callback.from_user.id)
         await callback.message.answer(text='Долг успешно закрыт',
                                       reply_markup=InlineKeyboards.my_debots_ikb())
         await callback.answer()
@@ -213,7 +213,7 @@ async def decrease_a_debt(mess: types.Message, state: FSMContext) -> None:
                                                        id_recipient=mess.from_user.id)
         data['new_amount'] = data['old_amount'] - data['amount']
     if data['new_amount'] <= 0:
-        await sqlite.delete_a_debt(data['login'], mess.from_user.id)
+        await sqlite.close_a_debt(data['login'], mess.from_user.id)
         await mess.answer(text='Долг стал равен нулю (или меньше), поэтому был закрыт',
                           reply_markup=InlineKeyboards.my_debots_ikb())
     else:
@@ -247,7 +247,8 @@ async def get_login_debtor(mess: types.Message, state: FSMContext):
         await mess.answer('Введите сумму долга')
 
 
-@dp.message_handler(lambda mess: not mess.text.isdigit(), state=states.MyDebtorsStatesGroup.debt_amount)
+@dp.message_handler(lambda mess: not mess.text.isdigit(),
+                    state=states.MyDebtorsStatesGroup.debt_amount)
 async def get_debt_amount(mess: types.Message):
     await mess.answer('Введите число!')
 
@@ -296,6 +297,7 @@ async def my_debts_ikb_menu(callback: types.CallbackQuery, state: FSMContext) ->
             data['check'] = await sqlite.get_non_approve_debts(callback.from_user.username)
         if data['check'] == []:
             await callback.message.answer(text=await text_processors.create_recipient_non_approve_debts_data(data['check']))
+            await callback.answer()
         else:
             await callback.message.answer(text=await text_processors.create_recipient_non_approve_debts_data(data['check']))
             await callback.message.answer(text='<b>Введите логин того (без @), чей долг хотите оспорить </b><em>('
@@ -332,7 +334,6 @@ async def get_text_for_dispute(mess: types.Message, state: FSMContext) -> None:
     await state.finish()
     await mess.answer(text='Спор был успешно создан, можете проверить его в меню всех споров',
                       reply_markup=keyboards.main_keyboard())
-
 
 
 @dp.message_handler(state=states.ApproveDebt.login_recipient)
@@ -396,13 +397,14 @@ async def dispute_my_debts(mess: types.Message, state:FSMContext) -> None:
         await mess.answer('У вас нет открытого спора с этим пользователем, введите повторно')
         await mess.answer(text=await text_processors.create_all_rec_dispute_data(data['rec']))
     else:
+        async with state.proxy() as data:
+            data['all_dispute'] = await sqlite.get_all_dispute_data(data['login_r'], mess.from_user.id)
         await states.HistoryDispute.dispute_menu.set()
         await mess.answer(text='Выберите опцию',
                           reply_markup=ReplyKeyboardRemove())
         await bot.send_photo(photo='https://4brain.ru/blog/wp-content/uploads/2020/05/v-spore-rozhdaetsya-istina.jpg',
                              reply_markup=InlineKeyboards.dispute_menu(),
                              chat_id=mess.chat.id)
-
 
 
 
@@ -421,9 +423,21 @@ async def dispute_menu(callback: types.CallbackQuery, state:FSMContext) -> None:
                           parse_mode='HTML')
         await callback.answer()
     elif callback.data == 'new_mess':
-        await callback.answer('Будет доступно позже')
+        await callback.message.answer('Напишите текст нового сообщения')
+        await states.HistoryDispute.new_mess.set()
     elif callback.data == 'approve_debt_by_dispute':
         await callback.answer('Будет доступно позже')
+
+
+@dp.message_handler(state=states.HistoryDispute.new_mess)
+async def new_mess_in_dispute(mess: types.Message, state:FSMContext) -> None:
+    async with state.proxy() as data:
+        pass
+    await sqlite.create_dispute(id_debt=data['all_dispute']['id_debt'], text=mess.text, type='debtor',
+                                id_recipient=data['id_rec'], id_debtor=mess.from_user.id)
+    await state.finish()
+    await mess.answer(text='Спор дополнен',
+                      reply_markup=keyboards.main_keyboard())
 
 
 if __name__ == '__main__':

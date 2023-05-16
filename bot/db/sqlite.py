@@ -67,9 +67,15 @@ async def update_user_debt(user_login: str, new_debt_amount: int, id_recipient: 
     db.commit()
 
 
-async def delete_a_debt(user_login: str, id_recipient: str) -> None:
+async def close_a_debt(user_login: str, id_recipient: str) -> None:
+    debt_id = cur.execute(f"SELECT id_debt FROM all_debts WHERE login_debtor = '{user_login}' AND user_id_recipient ='{id_recipient}' AND active == True").fetchone()
+    if debt_id != []:
+        cur.execute(
+            f"UPDATE history_dispute SET active = False WHERE id_debt == '{debt_id[0]}' ")
     cur.execute(
         f"UPDATE all_debts SET active = False WHERE login_debtor = '{user_login}' AND user_id_recipient ='{id_recipient}' AND active == True")
+
+
     db.commit()
 
 
@@ -108,9 +114,10 @@ async def approve_debt(login_debt: str, login_recipient: str) -> None:
 
 
 async def create_dispute(id_debt: str, text: str, type: str, id_recipient: str, id_debtor: str) -> None:
+    #Доработать время, сейчас всегда выводит время 00:00:00
     cur.execute("INSERT INTO history_dispute VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                 (str(uuid4()), id_debt, text, type, id_recipient, id_debtor,
-                 str(date.today()).replace('-', '.'), True))
+                 str(date.today().strftime('%Y-%m-%d %H:%M:%S')).replace('-', '.'), True))
     db.commit()
 
 
@@ -140,7 +147,7 @@ async def get_name_debtor_in_dispute(debtor_id: str) -> list:
     hd_data = cur.execute(f"SELECT id_recipient FROM history_dispute WHERE id_debtor == '{debtor_id}' AND active == True").fetchall()
     recipients = [x[0] for x in hd_data]
     users = {}
-    user_data = (cur.execute(f"SELECT user_id, login FROM users").fetchall())
+    user_data = cur.execute(f"SELECT user_id, login FROM users").fetchall()
     for x, y in user_data:
         users[x] = y
     login_debtors = set()
@@ -163,5 +170,15 @@ async def get_full_history_dispute(debtor_id: str, recipient_id: str) -> dict:
     return data
 
 
-
+async def get_all_dispute_data(user_login: str, debtor_id: str) -> dict:
+    id_rec = cur.execute(f"SELECT user_id FROM users WHERE login == '{user_login}' ").fetchone()[0]
+    hd_data = cur.execute(f"SELECT id_dispute, id_debt, id_recipient, id_debtor FROM history_dispute "
+                          f"WHERE id_debtor == '{debtor_id}' AND id_recipient == '{id_rec}' AND active == True").fetchone()
+    data = {
+        'id_dispute': hd_data[0],
+        'id_debt': hd_data[1],
+        'id_recipient': hd_data[2],
+        'id_debtor': hd_data[3]
+    }
+    return data
 

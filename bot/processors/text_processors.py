@@ -30,9 +30,9 @@ async def create_status_debts_data(text: list) -> str:
 
     for t in text:
         if t[7] == 0:
-            st_0 +=f'@{t[2]} - {str(t[5])} рублей. Срок отдачи - {t[6]}\n'
+            st_0 +=f'@{t[4]} - {str(t[5])} рублей. Срок отдачи - {t[6]}\n'
         else:
-            st_1 += f'@{t[2]} - {str(t[5])} рублей. Срок отдачи - {t[6]}\n'
+            st_1 += f'@{t[4]} - {str(t[5])} рублей. Срок отдачи - {t[6]}\n'
     if st_0 == '':
         end_st = f'Подтверждённые долги:\n\n{st_1}'
     elif st_1 == '':
@@ -54,5 +54,5 @@ async def create_history_dispute(data: dict, login_r: str = None,
     dialog = ''
     for i in data.keys():
         dialog += f'<b>{login_d}</b>: ' if data[i]['type'] == 'debtor' else f'<b>{login_r}</b>: '
-        dialog += f'{data[i]["text"]} <em>(Дата: {data[i]["date"]})</em>\n\n'
+        dialog += f'{data[i]["text"]} <em>({data[i]["date"]})</em>\n\n'
     return dialog

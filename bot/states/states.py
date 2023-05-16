@@ -26,3 +26,4 @@ class DisputeDebt(StatesGroup):
 class HistoryDispute(StatesGroup):
     login = State()
     dispute_menu = State()
+    new_mess = State()
